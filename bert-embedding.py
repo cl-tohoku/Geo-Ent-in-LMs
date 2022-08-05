@@ -5,6 +5,23 @@ import numpy as np
 import torch
 from scipy.spatial.distance import cosine
 from plot import plot_embeddings_bokeh
+import itertools
+
+def cal_group_L2_dist_mean(emb):
+    """
+    emb: ndarray.  size of ([n,768]) 
+    """
+    L2_dist_list = []
+    pdist = torch.nn.PairwiseDistance(p=2)
+    emb = torch.tensor(emb)
+    index_combi = list(itertools.combinations(range(emb.shape[0]),2))
+    for index in index_combi:
+        v1 = torch.unsqueeze(emb[index[0]], 0)
+        v2 = torch.unsqueeze(emb[index[1]], 0)
+        L2_dist_list.append(pdist(v1, v2))
+    L2_dist_mean = torch.cat(L2_dist_list).mean()
+    return L2_dist_mean
+        
 
 
 def bert_text_preparation(text, tokenizer):
@@ -146,4 +163,11 @@ print(f'\ntarget word is {target_word}')
 
 # plot embeddings
 target_word_embeddings = np.array(target_word_embeddings)
-plot_embeddings_bokeh(target_word_embeddings, emb_method="UMAP",  labels=texts, classes=classes, color=colors, size=20)
+#plot_embeddings_bokeh(target_word_embeddings, emb_method="UMAP",  labels=texts, classes=classes, color=colors, size=20)
+
+
+target_word_embeddings_river, target_word_embeddings_money = np.vsplit(target_word_embeddings,2)
+
+print("L2 Norm mean")
+print(f'river context(×4): {cal_group_L2_dist_mean(target_word_embeddings_river)}')
+print(f'money context(×4): {cal_group_L2_dist_mean(target_word_embeddings_money)}')
