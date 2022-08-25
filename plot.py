@@ -403,6 +403,7 @@ def plot_dendrogram(
 
 def get_palette(categories, cmap=None):
     from bokeh.palettes import (
+        Category10,
         Category20,
         Category20b,
         Category20c,
@@ -411,6 +412,8 @@ def get_palette(categories, cmap=None):
     n_cat = len(set(categories))
     if cmap is not None:
         return cmap[n_cat]
+    if n_cat <= 10:
+        return Category10[n_cat]
     if n_cat <= 20:
         if n_cat <= 2:
             palette = Category20[3]

@@ -136,7 +136,8 @@ dmypy.json
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -159,3 +160,5 @@ Temporary Items
 
 test_*
 dougu/
+mnd*
+generics*
