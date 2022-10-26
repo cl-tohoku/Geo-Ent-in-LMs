@@ -1,7 +1,9 @@
 import argparse
+import os
 from transformers import BertTokenizer, BertModel
 import pandas as pd
 import numpy as np
+import numpy.linalg as LA
 import torch
 from scipy.spatial.distance import cosine
 from plot import plot_embeddings_bokeh
@@ -9,9 +11,10 @@ import itertools
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from sklearn import mixture
-from bokeh.palettes import Category10
+from bokeh.palettes import Category20
 
-def plot_mnd(emb, outfile="GMM.png"):
+
+def cal_mnd_covariances_trace(emb, outfile="GMM.png"):
     # concatenate the two datasets into the final training set
     #X_train = np.vstack([shifted_gaussian, stretched_gaussian])
     X_train = emb
@@ -21,27 +24,29 @@ def plot_mnd(emb, outfile="GMM.png"):
     clf.fit(X_train)
 
     # display predicted scores by the model as a contour plot
-    #x = np.linspace(-20.0, 30.0)
-    #y = np.linspace(-20.0, 40.0)
-    #X, Y = np.meshgrid(x, y)
-    #XX = np.array([X.ravel(), Y.ravel()]).T
-    #Z = -clf.score_samples(XX)
-    #Z = Z.reshape(X.shape)
-#
-    #CS = plt.contour(
-    #    X, Y, Z, norm=LogNorm(vmin=1.0, vmax=1000.0), levels=np.logspace(0, 3, 10)
-    #)
-    #CB = plt.colorbar(CS, shrink=0.8, extend="both")
-    plt.figure()
-    plt.scatter(X_train[:, 0], X_train[:, 1])
-    plt.title("Negative log-likelihood predicted by a GMM")
-    plt.axis("tight")
-    plt.savefig(outfile)
-    plt.show()
-    #print(clf.covariances_)
-    #print(clf.covariances_.shape)
-    print(f'共分散行列の対角和：{np.trace(clf.covariances_[0])}')
-    print()
+    ##x = np.linspace(-20.0, 30.0)
+    ##y = np.linspace(-20.0, 40.0)
+    ##X, Y = np.meshgrid(x, y)
+    ##XX = np.array([X.ravel(), Y.ravel()]).T
+    ##Z = -clf.score_samples(XX)
+    ##Z = Z.reshape(X.shape)
+    ##CS = plt.contour(
+    ##    X, Y, Z, norm=LogNorm(vmin=1.0, vmax=1000.0), levels=np.logspace(0, 3, 10)
+    ##)
+    ##CB = plt.colorbar(CS, shrink=0.8, extend="both")
+
+    #plt.figure()
+    #plt.scatter(X_train[:, 0], X_train[:, 1])
+    #plt.title("Negative log-likelihood predicted by a GMM")
+    #plt.axis("tight")
+    #plt.savefig(outfile)
+    #plt.show()
+
+    #print(f'共分散行列の対角和：{np.trace(clf.covariances_[0])}')
+    #print(f'共分散行列の行列式：{LA.det(clf.covariances_[0])}')
+    #print(LA.eig(clf.covariances_[0])[0])
+    #print(np.sum(LA.eig(clf.covariances_[0])[0]))
+    return np.trace(clf.covariances_[0])
 
 def cal_group_pairwise_Lp_dist_mean(embeddings, p=2):
     """
@@ -57,9 +62,11 @@ def cal_group_pairwise_Lp_dist_mean(embeddings, p=2):
         v2 = torch.unsqueeze(embeddings[index[1]], 0)
         L2_dist_list.append(pdist(v1, v2))
     L2_dist_mean = torch.cat(L2_dist_list).mean()
+    if p==2:
+        L2_dist_mean = torch.pow(L2_dist_mean, 2)
     return L2_dist_mean
 
-def cal_group_avevec_L2_dist_mean(embeddings, ave_vector, p=2):
+def cal_group_avevec_Lp_dist_mean(embeddings, ave_vector, p=2):
     """
     embeddings: ndarray.  size of ([n,768]) 
     ave_vector: tensor. size of ([1, 768])
@@ -73,15 +80,18 @@ def cal_group_avevec_L2_dist_mean(embeddings, ave_vector, p=2):
         v1 = torch.unsqueeze(emb, 0)
         L2_dist_list.append(pdist(v1, ave_vector))
     L2_dist_mean = torch.cat(L2_dist_list).mean()
+    if p==2:
+        L2_dist_mean = torch.pow(L2_dist_mean, 2)
     return L2_dist_mean
 
 def generate_average_vector(embeddings):
     """
-    embeddings: ndarray.  size of ([n,768]) 
+    embeddings: list or ndarray or torch.tensor,  size of ([n,768]) 
     output : torch.tensor
     """
-    embeddings = torch.tensor(embeddings)
-    average_vector = torch.sum(embeddings, axis=0)
+    if torch.is_tensor(embeddings) == False:
+        embeddings = torch.tensor(embeddings)
+    average_vector = torch.sum(embeddings, axis=0) / len(embeddings)
     return average_vector
 
 
@@ -131,7 +141,7 @@ def get_bert_embeddings(tokens_tensor, segments_tensors, model):
             from token and segment ids
     
     Returns:
-        list: List of list of floats of size
+        np.array: List of list of floats of size
             [n_tokens, n_embedding_dimensions]
             containing embeddings for each token
     
@@ -150,7 +160,7 @@ def get_bert_embeddings(tokens_tensor, segments_tensors, model):
     # Collapsing the tensor into 1-dimension
     token_embeddings = torch.squeeze(token_embeddings, dim=0)
     # Converting torchtensors to lists
-    list_token_embeddings = [token_embed.tolist() for token_embed in token_embeddings]
+    list_token_embeddings = np.array([token_embed.tolist() for token_embed in token_embeddings])
 
     return list_token_embeddings
 
@@ -172,156 +182,202 @@ model = BertModel.from_pretrained('bert-base-uncased',
 # embeddings to ensure consistency
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
-# Text corpus
-##############
-# These sentences show the different
-# forms of the word 'bank' to show the
-# value of contextualized embeddings
-sentences_dic= {
-            "Obama" : 
-                [   "Obama was born in Honolulu, Hawaii. ",
-                    "Obama signed many landmark bills into law during his first two years in office.",
-                    "After winning re-election by defeating Republican opponent Mitt Romney, Obama was sworn in for a second term on January 20, 2013.",
-                    "Obama was elected over Republican nominee John McCain in the general election and was inaugurated alongside his running mate Joe Biden, on January 20, 2009. ",
-                    "Obama was elected President.",
-                    "Then Obama made an inaugural speech for about 20 minutes.",
-                    "U.S. President Barack Obama attended the game and threw out the ceremonial first pitch.",
-                    "Obama said the American people must remain vigilant.",
-                    "President Obama Meets With Myanmar's Aung San Suu Kyi.",
-                    "Romney criticized Obama's economic policies during his first term."
-                ],
-            "Clinton" : 
-                [   
-                    "Clinton was born and raised in Arkansas and attended Georgetown University. ",
-                    "Clinton presided over the longest period of peacetime economic expansion in American history.",
-                    "Clinton was elected president in the 1992 presidential election, defeating incumbent Republican president George H. W. Bush and independent businessman Ross Perot. ",
-                    "Clinton left office in 2001 with the joint-highest approval rating of any U.S. ",
-                    "The Republican Party won unified control of Congress for the first time in 40 years in the 1994 elections, but Clinton was still comfortably re-elected in 1996, becoming the first Democrat since Franklin D. Roosevelt to win a second full term. ",
-                    "Clinton was elected President.",
-                    "Clinton had asked to meet with the Empress again on this visit and the Empress invited her as a former first lady.",
-                    "He defeated Democrat Hillary Clinton, 69, a former First Lady and Secretary of State, by a narrow margin.",
-                    "Mr. Clinton was elected by an overwhelming majority.",
-                    "Bill Clinton was elected president of the United States."        
-                ],
-            "dog" : 
-                [   
-                    "This makes the domestic dog the most popular pet on the planet.",
-                    "A third of all households worldwide have a dog, according to a 2016 consumer insights study.",
-                    "For instance, he says kids should ask for permission from the dog’s owner before trying to pet or play with the animal. ",
-                    "And each time Fido stops to sniff a fire hydrant on your walk, it’s analyzing the pheromones left behind by another dog’s urine.",
-                    "Chasing sticks and balls may be linked to the pursuit of prey, while digging at the carpet or a dog bed echoes how a wild canid would prepare its sleeping area.",
-                    "Their dog was so fierce that he kept everyone away.",
-                    "The dog defended his master from harm.",
-                    "The dog barked all night.",
-                    "Don't let the dog in.",
-                    "There's no dog in the yard."
-                ],
-            "bank" :
-                [
-                    "A rock stuck out from the bank into the river.",
-                    "We walked on the bank of the Thames.",
-                    "The river flowed over its bank.",
-                    "The children slid down the bank.",
-                    "He stood on the bank, breathing heavily.",
-                    "The bank was out of money.",
-                    "He cashed a check at the bank.",
-                    "I had to wait in a line at the bank.",
-                    "Would you please check this matter with your bank?",
-                    "The bank transfer has been completed."
-                ]
-            }
+## data install
+# TODO : Embedding保存済みのdfをjsonlとして保存→以降それがあれば，それをdfとしてインストール&Embedding計算を省く
+processed_jsonl_file_path = '/data/emb_processed_human_more10_lastname_instances_sentences.jsonl'
+if os.path.isfile(processed_jsonl_file_path):
+    human_df = pd.read_json('/data/emb_processed_human_more10_lastname_instances_sentences.jsonl', orient='records', lines=True)
+else:
+    #human_df = pd.read_json('/data/human_more10_lastname_instances_sentences.jsonl', orient='records', lines=True)
+    human_df = pd.read_json("/data/human_more10_lastname_instances_sentences_addlastname_subword_less3.jsonl", orient="records", lines=True)
+    print("Computing Embedding")
+    # Getting embeddings for the target
+    # word in all given contexts
+
+    target_token_embeddings_list = []
+    for target_ne, sentence__list, lastname in zip(human_df['target_ne'], human_df['sentence_list'], human_df['lastname']):
+        target_token_sentence_embeddings = []
+        target_token = lastname
+        tokenized_target_token = tokenizer.tokenize(target_token)
+        print(tokenized_target_token)
+        if len(tokenized_target_token) >= 4:
+            print(f'len(tokenized_target_token) >= 4: {tokenized_target_token}')
+            continue
+
+        for sentence_dict in sentence__list:
+            sentence = sentence_dict['sentence']
+            tokenized_sentence, sentence_tokens_tensor, segments_tensors = bert_text_preparation(sentence, tokenizer)
+            sentence_embeddings = get_bert_embeddings(sentence_tokens_tensor, segments_tensors, model)
+            # Find the position target_token in list of tokens
+            tokenized_target_token_indexes = [tokenized_sentence.index(t) for t in tokenized_target_token]
+            # Get the embedding for target_token
+            tokenized_target_token_embeddings = [sentence_embeddings[token_index] for token_index in tokenized_target_token_indexes]
+            # サブワード分割されたtokensのAverageベクトルを埋め込みとして使用する            
+            ave_target_token_embeddings = generate_average_vector(tokenized_target_token_embeddings)
+            sentence_dict['embedding'] = ave_target_token_embeddings
+            target_token_sentence_embeddings.append(ave_target_token_embeddings)
+        target_token_embeddings_list.append(torch.stack(target_token_sentence_embeddings, dim=0))
+
+    human_df['target_token_embeddings_list'] = target_token_embeddings_list 
+    print(len(human_df))
+    print(human_df['sentence_count'].sum())
+    print()
+
+    # generate average vector
+    average_embeddings_list = []
+    # ここのtarget_token_embeddings_listの名前どうにかする
+    for embeddings_list in human_df['target_token_embeddings_list']:
+        print('print(np.array(embeddings_list).shape)')
+        print(np.array(embeddings_list).shape)
+        print(type(embeddings_list))
+        print(type(embeddings_list[0]))
+        #print(embeddings_list)
+        average_embeddings_list.append(generate_average_vector(embeddings_list))
+    human_df['average_embeddings'] = average_embeddings_list
+
+    #human_df.to_json('/data/emb_processed_human_more10_lastname_instances_sentences.jsonl', orient='records', force_ascii=False, lines=True)
+    ## Error：OverflowError: Maximum recursion level reached
+
+print("クラスタ内のベクトル同士の距離の平均")
+print("L1 ")
+capital_ijou_cnt = 0
+bank_ijou_cnt = 0
+pairwise_capital_L1 = 310.33938068547525
+pairwise_bank_L1    = 288.0361706233638
+for target_ne, target_token_embeddings_list, sentence_count	 in zip(human_df['target_ne'], human_df['target_token_embeddings_list'], human_df['sentence_count']):
+    result = cal_group_pairwise_Lp_dist_mean(target_token_embeddings_list, p=1)
+    print(f'{target_ne}, {result}, {sentence_count}')
+    if pairwise_capital_L1 < result:
+        capital_ijou_cnt += 1
+    if pairwise_bank_L1 < result:
+        bank_ijou_cnt += 1
+print(f'capital, {pairwise_capital_L1}, 10')
+print(f'bank, {pairwise_bank_L1}, 10')
+print(f"{len(human_df) - capital_ijou_cnt} < capital < {capital_ijou_cnt}")
+print(f"{len(human_df) - bank_ijou_cnt} < bank < {bank_ijou_cnt}")
+print("\n\n")
+
+print("L2 (2乗)")
+capital_ijou_cnt = 0
+bank_ijou_cnt = 0
+pairwise_capital_L2 = 196.15094833155018
+pairwise_bank_L2    = 171.06298105715894
+for target_ne, target_token_embeddings_list, sentence_count	 in zip(human_df['target_ne'], human_df['target_token_embeddings_list'], human_df['sentence_count']):
+    result = cal_group_pairwise_Lp_dist_mean(target_token_embeddings_list, p=2)
+    print(f'{target_ne}, {result}, {sentence_count}')
+    if pairwise_capital_L2 < result:
+        capital_ijou_cnt += 1
+    if pairwise_bank_L2 < result:
+        bank_ijou_cnt += 1
+print(f'capital, {pairwise_capital_L2}, 10')
+print(f'bank, {pairwise_bank_L2}, 10')
+print(f"{len(human_df) - capital_ijou_cnt} < capital < {capital_ijou_cnt}")
+print(f"{len(human_df) - bank_ijou_cnt} < bank < {bank_ijou_cnt}")
+
+
+print("クラスタ内の平均ベクトルと各ベクトル間の距離の平均")
+print("L1 ")
+capital_ijou_cnt = 0
+bank_ijou_cnt = 0
+avevec_capital_L1 = 211.02278376019768
+avevec_bank_L1    = 196.26752748101723
+for target_ne, target_token_embeddings_list, average_embeddings, sentence_count	 in zip(human_df['target_ne'], human_df['target_token_embeddings_list'], human_df['average_embeddings'], human_df['sentence_count']):
+    result = cal_group_avevec_Lp_dist_mean(target_token_embeddings_list, average_embeddings, p=1)
+    print(f'{target_ne}, {result}, {sentence_count}')
+    if avevec_capital_L1 < result:
+        capital_ijou_cnt += 1
+    if avevec_bank_L1 < result:
+        bank_ijou_cnt += 1
+print(f'capital, {avevec_capital_L1}, 10')
+print(f'bank, {avevec_bank_L1}, 10')
+print(f"{len(human_df) - capital_ijou_cnt} < capital < {capital_ijou_cnt}")
+print(f"{len(human_df) - bank_ijou_cnt} < bank < {bank_ijou_cnt}")
+print("\n\n")
+
+print("L2 (2乗)")
+capital_ijou_cnt = 0
+bank_ijou_cnt = 0
+avevec_capital_L2 = 91.01377147239918
+avevec_bank_L2    = 79.54951687964392
+for target_ne, target_token_embeddings_list, average_embeddings, sentence_count	 in zip(human_df['target_ne'], human_df['target_token_embeddings_list'], human_df['average_embeddings'], human_df['sentence_count']):
+    result = cal_group_avevec_Lp_dist_mean(target_token_embeddings_list, average_embeddings, p=2)
+    print(f'{target_ne}, {result}, {sentence_count}')
+    if avevec_capital_L2 < result:
+        capital_ijou_cnt += 1
+    if avevec_bank_L2 < result:
+        bank_ijou_cnt += 1
+print(f'capital, {avevec_capital_L2}, 10')
+print(f'bank, {avevec_bank_L2}, 10')
+print(f"{len(human_df) - capital_ijou_cnt} < capital < {capital_ijou_cnt}")
+print(f"{len(human_df) - bank_ijou_cnt} < bank < {bank_ijou_cnt}")
 
 ## bokeh argument 
-label_texts = sentences_dic.copy()
-label_texts = list(itertools.chain.from_iterable(list(label_texts.values())))
-colors_category = Category10[len(sentences_dic.keys()) +1]
+bokeh_target_token_embeddings = []
 colors = []
 classes = []
-for i, key in enumerate(sentences_dic.keys()):
-    colors += ([colors_category[i]] * len(sentences_dic[key]))
-    classes += ([key] * len(sentences_dic[key]))
-for i, key in enumerate(sentences_dic.keys()):
-    label_texts.append("average_"+key)
-    classes.append("average_"+key)
-colors += ([colors_category[len(sentences_dic.keys())]] * len(sentences_dic.keys()))
+label_texts = []
+colors_category_list = Category20[20]
+cnt = 0
+for target_ne, sentence_list, emb, sentence_count	in zip(human_df['target_ne'], human_df['sentence_list'], human_df['target_token_embeddings_list'], human_df['sentence_count']):
+    bokeh_target_token_embeddings.extend(np.array(emb))
+    classes += ([target_ne] * sentence_count)
+    colors += ([colors_category_list[cnt]] * sentence_count)
+    for sentence_dict in sentence__list:
+        label_texts.append(sentence_dict['sentence'])
+        #label_texts.extend(sentence_dict['sentence'])
+    cnt += 1
+    if cnt >= 20 :
+        break
 
-print(colors)
-print(classes)
+print()
+print('print(np.array(bokeh_target_token_embeddings).shape)')
+print(np.array(bokeh_target_token_embeddings).shape)
+print('print(len(bokeh_target_token_embeddings))')
+print(len(bokeh_target_token_embeddings))
+print('print(len(bokeh_target_token_embeddings[0]))')
+print(len(bokeh_target_token_embeddings[0]))
+print('print(type(bokeh_target_token_embeddings))')
+print(type(bokeh_target_token_embeddings))
+print('print(type(bokeh_target_token_embeddings[0]))')
+print(type(bokeh_target_token_embeddings[0]))
+print()
+print('print(len(colors))')
+print(len(colors))
+print('print(len(classes))')
+print(len(classes))
+print('print(len(label_texts))')
+print(len(label_texts))
+print('print(len(label_texts[0]))')
+print(len(label_texts[0]))
+print()
 
-# Getting embeddings for the target
-# word in all given contexts
-target_word_embeddings = []
-for target_word, sentences in sentences_dic.items():
-    for sentence in sentences:
-        tokenized_text, tokens_tensor, segments_tensors = bert_text_preparation(sentence, tokenizer)
-        list_token_embeddings = get_bert_embeddings(tokens_tensor, segments_tensors, model)
-        # Find the position target_word in list of tokens
-        word_index = tokenized_text.index(tokenizer.tokenize(target_word)[0])
-        # Get the embedding for target_word
-        word_embedding = list_token_embeddings[word_index]
-        target_word_embeddings.append(word_embedding)
+## plot embeddings
+#plot_embeddings_bokeh(bokeh_target_token_embeddings, emb_method="UMAP", labels=label_texts, classes=classes, color=colors, size=8)
+# labelの数が合わずにエラーとなるので消した
+plot_embeddings_bokeh(bokeh_target_token_embeddings, emb_method="UMAP", classes=classes, color=colors, size=8)
 
-# Calculating the cosine similarity between the
-# embeddings of target_word in all the given contexts of the word
-#list_of_cos_similarity = []
-#for text1, embed1 in zip(sentences_dic, target_word_embeddings):
-#    for text2, embed2 in zip(sentences_dic, target_word_embeddings):
-#        cos_sim = 1 - cosine(embed1, embed2) # 'cosine' is cosine distance 
-#        list_of_cos_similarity.append([text1, text2, cos_sim])
-#cos_similarity_df = pd.DataFrame(list_of_cos_similarity, columns=['text1', 'text2', 'cosine similarity'])
-#print(cos_similarity_df)
+##plot_embeddings_bokeh(target_token_embeddings, emb_method="UMAP",  labels=label_texts, classes=classes, color=colors, size=20)
+## BokehUserWarning: ColumnDataSource's columns must be of the same length. Current lengths: ('class', 1546), ('color', 1546), ('label', 45940), ('x', 1546), ('y', 1546)
+## [[sentence],[sentence]]の形にすると良さそう
+## appendだと('label', 240)になる．extendだと('label', 45940)になる
 
-target_word_embeddings = np.array(target_word_embeddings)
-## 以下後でFixする(keyの数の分、自動で保存する)
-# split embeddings
-target_word_embeddings_obama, target_word_embeddings_clinton, target_word_embeddings_dog, target_word_embeddings_bank = np.vsplit(target_word_embeddings, len(sentences_dic.keys()))
-splited_target_word_embeddings = np.vsplit(target_word_embeddings, len(sentences_dic.keys()))
 
-# generate average vector
-average_embeddings_obama = generate_average_vector(target_word_embeddings_obama)
-average_embeddings_clinton = generate_average_vector(target_word_embeddings_clinton)
-average_embeddings_dog = generate_average_vector(target_word_embeddings_dog)
-average_embeddings_bank = generate_average_vector(target_word_embeddings_bank)
-
-print("各ベクトル間の距離の平均")
-print("L1 Norm mean")
-print(f'Obama context(×{len(target_word_embeddings_obama)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_obama, p=1)}')
-print(f'Clinton context(×{len(target_word_embeddings_clinton)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_clinton, p=1)}')
-print(f'dog context(×{len(target_word_embeddings_dog)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_dog, p=1)}')
-print(f'bank context(×{len(target_word_embeddings_bank)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_bank, p=1)}\n')
-print("L2 Norm mean")
-print(f'Obama context(×{len(target_word_embeddings_obama)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_obama, p=2)}')
-print(f'Clinton context(×{len(target_word_embeddings_clinton)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_clinton, p=2)}')
-print(f'dog context(×{len(target_word_embeddings_dog)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_dog, p=2)}')
-print(f'bank context(×{len(target_word_embeddings_bank)}): {cal_group_pairwise_Lp_dist_mean(target_word_embeddings_bank, p=2)}\n')
-
-print("平均ベクトルからの距離の平均")
-print("L1 Norm mean")
-print(f'Obama context(×{len(target_word_embeddings_obama)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_obama, average_embeddings_obama, p=1)}')
-print(f'Clinton context(×{len(target_word_embeddings_clinton)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_clinton, average_embeddings_clinton, p=1)}')
-print(f'dog context(×{len(target_word_embeddings_dog)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_dog, average_embeddings_dog, p=1)}')
-print(f'bank context(×{len(target_word_embeddings_bank)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_bank, average_embeddings_bank, p=1)}\n')
-print("L2 Norm mean")
-print(f'Obama context(×{len(target_word_embeddings_obama)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_obama, average_embeddings_obama, p=2)}')
-print(f'Clinton context(×{len(target_word_embeddings_clinton)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_clinton, average_embeddings_clinton, p=2)}')
-print(f'dog context(×{len(target_word_embeddings_dog)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_dog, average_embeddings_dog, p=2)}')
-print(f'bank context(×{len(target_word_embeddings_bank)}): {cal_group_avevec_L2_dist_mean(target_word_embeddings_bank, average_embeddings_bank, p=2)}\n')
-
-# plot embeddings
-## add average embeddings
-target_word_embeddings = np.vstack((target_word_embeddings, np.array(average_embeddings_obama)))
-target_word_embeddings = np.vstack((target_word_embeddings, np.array(average_embeddings_clinton)))
-target_word_embeddings = np.vstack((target_word_embeddings, np.array(average_embeddings_dog)))
-target_word_embeddings = np.vstack((target_word_embeddings, np.array(average_embeddings_bank)))
-
-plot_embeddings_bokeh(target_word_embeddings, emb_method="UMAP",  labels=label_texts, classes=classes, color=colors, size=20)
-
-# plot multivariate normal distribution
-print("obama")
-plot_mnd(target_word_embeddings_obama, outfile="mnd_obama")
-print("clinton")
-plot_mnd(target_word_embeddings_clinton, outfile="mnd_clinton")
-print("dog")
-plot_mnd(target_word_embeddings_dog, outfile="mnd_dog")
-print("bank")
-plot_mnd(target_word_embeddings_bank, outfile="mnd_bank")
+## plot multivariate normal distribution
+#print('多変量正規分布')
+#print('分散共分散行列の対角和')
+#
+#capital_ijou_cnt = 0
+#bank_ijou_cnt = 0
+#covariances_trace_capital = 91.38672402011633
+#covariances_trace_bank    = 80.12135733510718
+#for target_ne, target_token_embeddings_list, sentence_count	 in zip(human_df['target_ne'], human_df['target_token_embeddings_list'], human_df['sentence_count']):
+#    result = cal_mnd_covariances_trace(target_token_embeddings_list)
+#    print(f'{target_ne} context(×{sentence_count}): {result}')
+#    if covariances_trace_capital < result:
+#        capital_ijou_cnt += 1
+#    if covariances_trace_bank < result:
+#        bank_ijou_cnt += 1
+#print(f"{len(human_df) - capital_ijou_cnt} < capital < {capital_ijou_cnt}")
+#print(f"{len(human_df) - bank_ijou_cnt} < bank < {bank_ijou_cnt}")
+#print("\n\n")
+#
