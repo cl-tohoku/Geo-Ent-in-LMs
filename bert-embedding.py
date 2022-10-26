@@ -329,28 +329,6 @@ for target_ne, sentence_list, emb, sentence_count	in zip(human_df['target_ne'], 
     if cnt >= 20 :
         break
 
-print()
-print('print(np.array(bokeh_target_token_embeddings).shape)')
-print(np.array(bokeh_target_token_embeddings).shape)
-print('print(len(bokeh_target_token_embeddings))')
-print(len(bokeh_target_token_embeddings))
-print('print(len(bokeh_target_token_embeddings[0]))')
-print(len(bokeh_target_token_embeddings[0]))
-print('print(type(bokeh_target_token_embeddings))')
-print(type(bokeh_target_token_embeddings))
-print('print(type(bokeh_target_token_embeddings[0]))')
-print(type(bokeh_target_token_embeddings[0]))
-print()
-print('print(len(colors))')
-print(len(colors))
-print('print(len(classes))')
-print(len(classes))
-print('print(len(label_texts))')
-print(len(label_texts))
-print('print(len(label_texts[0]))')
-print(len(label_texts[0]))
-print()
-
 ## plot embeddings
 #plot_embeddings_bokeh(bokeh_target_token_embeddings, emb_method="UMAP", labels=label_texts, classes=classes, color=colors, size=8)
 # labelの数が合わずにエラーとなるので消した
