@@ -1,6 +1,6 @@
 ### https://raw.github.com/github/gitignore/21419e391a78f2487340b3b1240b988aaf15b54f/Python.gitignore
 .env
-
+.*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -165,3 +165,9 @@ generics*
 bert-embedding_old.html
 miniball/
 result/
+shell_file/
+*_old*
+test*
+visualization/
+*memo*
+wikilinks.ipynb
