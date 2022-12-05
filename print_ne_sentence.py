@@ -29,8 +29,8 @@ df = read_json(args.input)
 #以下は集約されていない版
 word_type_counter = collections.Counter(df['word_type'])
 print(f"word_typeの分布： {word_type_counter}")
-print(f"NEの数：{word_type_counter['ne']}，    NEの割合： {word_type_counter['ne']/len(df['word_type'])}")
-print(f"NE以外の数：{word_type_counter['non_ne']}，    NE以外の割合： {word_type_counter['non_ne']/len(df['word_type'])}")
+print(f"NEの数：{word_type_counter['ne']}，    NEの割合： {word_type_counter['ne']/len(df['word_type'])} = {word_type_counter['ne']/len(df['word_type'])* 100}%")
+print(f"NE以外の数：{word_type_counter['non_ne']}，    NE以外の割合： {word_type_counter['non_ne']/len(df['word_type'])} = {word_type_counter['non_ne']/len(df['word_type']) * 100}%")
 print()
 
 print(df.head(args.n))

@@ -17,6 +17,7 @@ from sklearn import mixture
 from tqdm import tqdm
 from itertools import chain
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 
 
 def get_args():
@@ -82,12 +83,13 @@ def parallel_cal_percentage_of_own_cluster(df, p=2):
     #pdist = torch.nn.PairwiseDistance(p=p)
     #dist_list = []
     #own_count = 0
-    cpu_num = os.cpu_count() // 2
-    #cpu_num = 8
+    #cpu_num = os.cpu_count() // 2
+    cpu_num = 1
     print(f'使用cpu数:{cpu_num}')
     with tqdm(total=len(df)) as progress:
         try:
             with ProcessPoolExecutor(max_workers=cpu_num) as executor:  
+            #with ThreadPoolExecutor(max_workers=cpu_num) as executor:  
                 futures = []  # 処理結果を保存するlist
                 for i, (target_word_embeddings_list, sentence_count) in enumerate(zip(df['target_word_embeddings_list'], df['sentence_count'])):
                     future = executor.submit(fn, i, df['average_embeddings'], p, target_word_embeddings_list, sentence_count)
@@ -247,13 +249,10 @@ emb_list = multiple_load_tensor(args.emb_path)
 
 ## splitされたデータをconcatする
 concat_df = pd.concat(df_list).reset_index(drop=True)
-print(f'len(concat_df): {len(concat_df)}','\n')
-print(f'len(concat_df[0]): {len(concat_df[0])}','\n')
-print(f'len(concat_df[0][0]): {len(concat_df[0][0])}','\n')
+#print(f'len(concat_df): {len(concat_df)}','\n')
+#print(f'len(concat_df[0]): {len(concat_df[0])}','\n')
+#print(f'len(concat_df[0][0]): {len(concat_df[0][0])}','\n')
 
-raise 
-
-## TODO: concat_embに失敗する
 #concat_emb = list(chain.from_iterable(emb_list)) #extendなのでいらない
 #concat_emb = emb_list
 print(f'len(concat_emb): {len(emb_list)}','\n')

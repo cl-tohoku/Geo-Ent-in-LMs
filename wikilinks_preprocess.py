@@ -60,7 +60,7 @@ def get_args():
                         help="save dataset path")
     parser.add_argument('--sentence_count_lower', type=int, default=None,
                         help='Lower limit on the number of sentences')
-    parser.add_argument("--split", type=int, default=None,
+    parser.add_argument("--split", type=int, default=0,
                         help="data split")
     parser.add_argument("--before_name", type=str, default=None,
                         help="")
@@ -136,22 +136,14 @@ def multiple_load_tensor(path_list):
     for path in path_list:
         print(f'loading : {path}')
         tensor = torch.load(path)
-        print(f'len(tensor) :{len(tensor)}')
-        print(f'len(tensor[0]) :{len(tensor[0])}')
-        print(f'len(tensor[0][0]) :{len(tensor[0][0])}')
-        print(f'type(tensor) :{type(tensor)}')
-        print(f'type(tensor[0]) :{type(tensor[0])}')
-        print(f'type(tensor[0][0]) :{type(tensor[0][0])}')
-        print()
         #tensor = np.ravel(tensor_array) #平坦化
         ##tensor = np.ravel(tensor)
         #x = torch.from_numpy(tensor.astype(np.float32)).clone()
         #tensor = torch.stack(x, dim=0)
-        #tensor_list.extend(tensor)
+        tensor_list.extend(tensor)
     #print(f'len(tensor_list) :{len(tensor_list)}')
     #print(f'len(tensor_list[0]) :{len(tensor_list[0])}')
-    print()
-    raise 
+    #raise 
     return tensor_list
 
 # wikilinksのX以上のセンテンスのインスタンスのみを新たなdfとして保存する
@@ -742,13 +734,42 @@ def add_word_type_column(path, args):
     print(f"Done : {path}")
 
 
-# splitされたtensor.ptをconcatする
+# 集約 &splitされたtensor.ptをconcatする
+# NE の集約 & Splitされた tensorをConcatする
 def create_concat_tensor(path_list, args):
     print("multiple_load_tensor")
     emb_list = multiple_load_tensor(path_list)
-    emb_tensor = torch.stack(emb_list, dim=0)
+    print(f'type(emb_list) :{type(emb_list)}')
+    print(f'len(emb_list) :{len(emb_list)}\n')
+    print(f'type(emb_list[0]) :{type(emb_list[0])}')
+    print(f'len(emb_list[0]) :{len(emb_list[0])}')
+    print(f'len(emb_list[1]) :{len(emb_list[1])}')
+    print(f'len(emb_list[2]) :{len(emb_list[2])}\n')
+    print(f'type(emb_list[0][0]) :{type(emb_list[0][0])}')
+    print(f'len(emb_list[0][0]) :{len(emb_list[0][0])}')
+    print(f'len(emb_list[0][1]) :{len(emb_list[0][1])}')
+    print(f'len(emb_list[1][1]) :{len(emb_list[1][1])}')
+    sentence_emb_list = []
+    for emb in tqdm(emb_list):
+        sentence_emb_list.extend(emb)
+        #for sentence_emb in emb:
+        #    sentence_emb_list.extend(sentence_emb)
+
+    del emb_list
+
+    print(f'type(sentence_emb_list) :{type(sentence_emb_list)}')
+    print(f"len(sentence_emb_list) :{'{:,}'.format(len(sentence_emb_list))}")
+    print(f'type(sentence_emb_list[0]) :{type(sentence_emb_list[0])}')
+
+    emb_tensor = torch.stack(sentence_emb_list, dim=0)  # ここでメモリ不足でkillされる
+    del sentence_emb_list
+    print(f'type(emb_tensor) :{type(emb_tensor)}')
+    print(f'emb_tensor.size() :{emb_tensor.size()}')
+    
     path_without_ext = str(path_list[0]).replace('.pt', '')
-    torch.save(emb_tensor, path_without_ext +  "_aggreagated.pt")
+    dir_name = os.path.dirname(path_list[0])
+    output_filename = dir_name + '/concat_'+ basename_without_ext +'.pt'
+    torch.save(emb_tensor, output_filename )
 
 
 # splitされたdfをconcatする
@@ -780,7 +801,7 @@ def create_concat_df(path_list, args):
     new_df.to_json(args.output, orient='records', force_ascii=False, lines=True)
     print("Done")
 
-# splitされたdfにあるColumnをconcatする
+# splitされたdfのColumnをconcatする
 def create_concat_column(path_list, args):
     print("multiple_load_df")
     target_word_list = []

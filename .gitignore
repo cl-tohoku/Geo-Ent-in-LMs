@@ -165,7 +165,7 @@ generics*
 bert-embedding_old.html
 miniball/
 result/
-shell_file/
+#shell_file/
 *_old*
 test*
 visualization/

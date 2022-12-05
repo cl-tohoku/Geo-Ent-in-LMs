@@ -1,0 +1,5 @@
+input_path="/data/wikilinks/aggregated_preprocessed_common_noun_512tokens_non_ne_vocabwikilinks_more_10.jsonl"
+
+sentence_count_lower=100
+python3 wikilinks_preprocess.py --preprocessors create_aggregation_df_more_k --input $input_path --sentence_count_lower $sentence_count_lower
+wait
