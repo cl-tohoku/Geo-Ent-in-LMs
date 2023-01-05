@@ -8,6 +8,7 @@ import pandas as pd
 import numpy as np
 import numpy.linalg as LA
 import torch
+import re
 from scipy.spatial.distance import cosine
 from plot import plot_embeddings_bokeh
 import itertools
@@ -15,6 +16,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from sklearn import mixture
 from tqdm import tqdm
+import collections
 from itertools import chain
 from concurrent.futures import ProcessPoolExecutor
 from concurrent.futures import ThreadPoolExecutor
@@ -36,22 +38,60 @@ def get_args():
                             help="")
     parser.add_argument("--do_parallel",  action='store_true',
                             help="")
+    parser.add_argument("--is_group_by_Wiki_id", action='store_true',
+                            help="")
     args = parser.parse_args()
     return args
 
+
+def getTitleFromWikipediaURL(url):
+    # 正規表現パターン
+    if 'https' in url:
+        pattern = r"https://en.wikipedia.org/wiki/(.+)"
+    elif 'http' in url:
+        if '/en.wikipedia.org/wiki/' in url:
+            pattern = r"http://en.wikipedia.org/wiki/(.+)"
+        elif '/en.wikipedia.org//wiki/' in url:
+            pattern = r"http://en.wikipedia.org//wiki/(.+)"
+        elif  '/en.wikipedia.org/' in url and '/' not in url.replace('http://en.wikipedia.org/', ''):
+            pattern = r"http://en.wikipedia.org/(.+)"
+        else :
+            print("return None")
+            return None
+    # 正規表現オブジェクトを作成
+    regex = re.compile(pattern)
+    # URLをマッチさせる
+    match = regex.match(url)
+    # タイトルを取得
+    try:
+        title = match.group(1)
+    except:
+        return None
+    title = title.replace('_', ' ')
+    return title
+
 def fn(i, average_embeddings, p, target_word_embeddings_list, sentence_count):
     try:
-        pdist = torch.nn.PairwiseDistance(p=p)
-        dist_list = []
+        
+        #pdist = torch.nn.PairwiseDistance(p=p)
+        #dist_list = []
+        cdist = torch.cdist
         own_count = 0
-        for target_word_embedding in target_word_embeddings_list:
-            target_word_emb = torch.unsqueeze(target_word_embedding, 0)
-            for j, ave_embedding in enumerate(average_embeddings):
-                ave_emb = torch.unsqueeze(ave_embedding, 0)
-                dist_list.extend(pdist(target_word_emb, ave_emb))
-            if dist_list.index(min(dist_list)) == i:
-                own_count += 1
-            dist_list = []
+
+        target_word_embeddings_tensor = torch.stack(target_word_embeddings_list)
+        average_embeddings_tensor = torch.stack(average_embeddings.tolist())
+        d = cdist(target_word_embeddings_tensor, average_embeddings_tensor, p=p)
+        values,indices =  torch.min(d, dim=1)
+        own_count = torch.count_nonzero(indices == i).item()
+
+        #for target_word_embedding in target_word_embeddings_list:
+        #    target_word_emb = torch.unsqueeze(target_word_embedding, 0)
+        #    for j, ave_embedding in enumerate(average_embeddings):
+        #        ave_emb = torch.unsqueeze(ave_embedding, 0)
+        #        dist_list.extend(pdist(target_word_emb, ave_emb))
+        #    if dist_list.index(min(dist_list)) == i:
+        #        own_count += 1
+        #    dist_list = []
     except ConnectionResetError:
         print('ConnectionResetError -> pass')
         pass
@@ -59,6 +99,7 @@ def fn(i, average_embeddings, p, target_word_embeddings_list, sentence_count):
         print('ConnectionRefusedError -> pass')
         pass
     except EOFError:
+        
         pass
     except socket.error as e:
         if e.errno != errno.ECONNRESET:
@@ -67,6 +108,7 @@ def fn(i, average_embeddings, p, target_word_embeddings_list, sentence_count):
     return own_count, own_count/sentence_count
 
 ## 各 Embeddingの最近傍のクラスタの中心が自クラスタである割合を算出
+##  現状，並列で動かない
 def parallel_cal_percentage_of_own_cluster(df, p=2):
     """
     Args:
@@ -83,9 +125,9 @@ def parallel_cal_percentage_of_own_cluster(df, p=2):
     #pdist = torch.nn.PairwiseDistance(p=p)
     #dist_list = []
     #own_count = 0
-    #cpu_num = os.cpu_count() // 2
-    cpu_num = 1
-    print(f'使用cpu数:{cpu_num}')
+    #cpu_num = os.cpu_count() - 10
+    cpu_num = 4
+    print(f"使用cpu数:{cpu_num}")
     with tqdm(total=len(df)) as progress:
         try:
             with ProcessPoolExecutor(max_workers=cpu_num) as executor:  
@@ -124,7 +166,7 @@ def parallel_cal_percentage_of_own_cluster(df, p=2):
     return own_count_list, percentage_of_own_cluster
 
 # 直列ver
-def series_cal_percentage_of_own_cluster(df, p=2):
+def series_cal_percentage_of_own_cluster(df, p=2, is_group_by_Wiki_id=False):
     """
     input:
         dataframe
@@ -141,41 +183,63 @@ def series_cal_percentage_of_own_cluster(df, p=2):
     own_count_list = []
     dist_list = []
     percentage_of_own_cluster = []
+    wrong_cluster_list = []
+    wrong_type_list = []
+    wrong_pair_list = []
     for i, (target_word_embeddings_list, sentence_count) in enumerate(zip(tqdm(df['target_word_embeddings_list']), df['sentence_count'])):
-        for target_word_embedding in target_word_embeddings_list:
-            target_word_emb = torch.unsqueeze(target_word_embedding, 0)
-            for j, ave_embedding in enumerate(df['average_embeddings']):
-                ave_emb = torch.unsqueeze(ave_embedding, 0)
-                dist_list.extend(pdist(target_word_emb, ave_emb))
-            if dist_list.index(min(dist_list)) == i:
-                own_count += 1
-            dist_list = []
+        target_word_embeddings_tensor = torch.stack(target_word_embeddings_list)
+        average_embeddings = torch.stack(df['average_embeddings'].tolist())
+        d = torch.cdist(target_word_embeddings_tensor, average_embeddings, p=2)
+        values,indices =  torch.min(d, dim=1)
+        own_count = torch.count_nonzero(indices == i).item()
 
-        #if args.category == 'ne':
-        #    print(df['target_word'][i])
-        #elif args.category == 'common_noun':
-        #    print(df['noun'][i])
-        #print(f'own_count = {own_count}')
-        #print(f'sentence_count = {sentence_count}')
-        #print(f'own_count/sentence_count = {own_count/sentence_count}\n')
+        wrong_other_cluster_indices = indices[indices != i]
+        wrong_own_clusterWord_indices = torch.where(indices != i)[0]
+        if is_group_by_Wiki_id:
+            wrong_cluster = [df['target_word'][k.item()][0] for k in wrong_other_cluster_indices]
+            wrong_pair = [ df['target_word'][i][wrong_own_clusterWord_indices[j].item()] + ' : ' + df['target_word'][wrong_other_cluster_indices[j].item()][0] for j in range(len(wrong_other_cluster_indices))]
+            wrong_type = [(df['notable_figer_types'][k.item()][0] if df['word_type'][k.item()]=='ne' else 'Non_NE') for k in wrong_other_cluster_indices]
+            wrong_pair_list.append(collections.Counter(wrong_pair))
+        else:
+            wrong_cluster = [df['target_word'][k.item()] for k in wrong_other_cluster_indices]
+            wrong_type = [(df['notable_figer_types'][k.item()] if df['word_type'][k.item()]=='ne' else 'Non_NE') for k in wrong_other_cluster_indices]
+        wrong_cluster_list.append(collections.Counter(wrong_cluster))
+        wrong_type_list.append(collections.Counter(wrong_type))
+
+        #for target_word_embedding in target_word_embeddings_list:
+        #    target_word_emb = torch.unsqueeze(target_word_embedding, 0)
+        #    for j, ave_embedding in enumerate(df['average_embeddings']):
+        #        ave_emb = torch.unsqueeze(ave_embedding, 0)
+        #        dist_list.extend(pdist(target_word_emb, ave_emb))
+        #    if dist_list.index(min(dist_list)) == i:
+        #        own_count += 1
+        #    dist_list = []
+
         own_count_list.append(own_count)
         percentage_of_own_cluster.append(own_count/sentence_count)
         own_count = 0
-    return own_count_list, percentage_of_own_cluster
+    return own_count_list, percentage_of_own_cluster, wrong_cluster_list, wrong_pair_list, wrong_type_list
 
 
 def cal_micro_ave(list_1, list_2):
     return list_1.sum() / list_2.sum()
 
-def save_df_to_csv(df, output_path):
+def save_df2jsonl(df, output_path):
     #TODO: result dir がなければ作成する
-    print(f'savefile path: {output_path}')
+    new_df = df[['target_word', 'notable_figer_types', 'percentage_of_own_cluster', 'own_count_list',  'sentence_count', 'wrong_cluster', 'wrong_types', 'wiki_id', 'word_type']]
 
-    output_df = pd.DataFrame([df['target_word'], df['percentage_of_own_cluster'], df['own_count_list'],  df['sentence_count']]).T
-    micro_ave = cal_micro_ave(df['own_count_list'], df['sentence_count'])
-    print(f'micro_ave : {micro_ave}')
-    output_df.append({"micro_ave" : micro_ave}, ignore_index=True)
-    output_df.to_csv(output_path, encoding="utf_8_sig")
+    if 'target_word_sub_len'  in df.columns:
+        new_df['target_word_sub_len'] = df['target_word_sub_len']
+    if 'alias_count'  in df.columns:
+        new_df['alias_count'] = df['alias_count']
+    if 'wrong_pair'  in df.columns:
+        new_df['wrong_pair'] = df['wrong_pair']
+
+    # df →　jsonl形式で保存する
+    print(f'savefile path: {output_path}')
+    new_df.to_json(output_path, orient='records', force_ascii=False, lines=True)
+
+
 
 def print_arg_path_list(path_list):
     print(path_list)
@@ -212,32 +276,102 @@ def generate_average_vector(embeddings):
     average_vector = torch.sum(embeddings, axis=0) / len(embeddings)
     return average_vector
 
-def aggregate_df(df):
+def aggregate_df(df, is_group_by_Wiki_id=False):
+    print(f"is_group_by_Wiki_id : {is_group_by_Wiki_id}")
     ## 処理用データ作成
     print('データを集約')
     sentence_dict = defaultdict(list)
+    target_word_dict = defaultdict(list)
     target_word_embeddings_dict = defaultdict(list)
-    for target_word, sentence, target_word_embedding in zip(tqdm(df['target_word']), df['sentence'], df['target_word_embeddings_list']):
-        sentence_dict[target_word].append(sentence)
-        target_word_embeddings_dict[target_word].append(target_word_embedding)
+    word_type_dict = {}
+    category_dict = {}
+    wiki_id_dict = {}
+    target_word_sub_len_dict = {}
+    alias_count_dict = {}
+    word_type_dict = {}
+    
+    print(df.columns)
+    for i , (target_word, sentence, target_word_embedding, word_type) in enumerate(zip(tqdm(df['target_word']), df['sentence'], df['target_word_embeddings_list'], df['word_type'])):
+        if is_group_by_Wiki_id: # group by wiki_id
+            if word_type == 'ne':
+                sentence_dict[df['wiki_id'][i]].append(sentence)
+                target_word_dict[df['wiki_id'][i]].append(target_word)
+                target_word_embeddings_dict[df['wiki_id'][i]].append(target_word_embedding)
+                word_type_dict[df['wiki_id'][i]] = word_type
+                if 'notable_figer_types'  in df.columns:
+                    category_dict[df['wiki_id'][i]] = df['notable_figer_types'][i]
+                if 'wiki_id'  in df.columns:
+                    wiki_id_dict[df['wiki_id'][i]] = df['wiki_id'][i]
+                if 'target_word_sub_len'  in df.columns:
+                    target_word_sub_len_dict[df['wiki_id'][i]] = df['target_word_sub_len'][i]
+                if 'alias_count' in df.columns:
+                    alias_count_dict[df['wiki_id'][i]] = df['alias_count'][i]
+
+            elif word_type == 'non_ne':
+                sentence_dict[target_word].append(sentence)
+                target_word_embeddings_dict[target_word].append(target_word_embedding)
+                target_word_dict[target_word].append(target_word)
+                word_type_dict[target_word] = word_type
+                if 'target_word_sub_len'  in df.columns:
+                    target_word_sub_len_dict[target_word] = df['target_word_sub_len'][i]
+                if 'notable_figer_types'  in df.columns:
+                    category_dict[target_word] = df['notable_figer_types'][i]
+                if 'wiki_id'  in df.columns:
+                    wiki_id_dict[target_word] = df['wiki_id'][i]
+                if 'target_word_sub_len'  in df.columns:
+                    target_word_sub_len_dict[target_word] = df['target_word_sub_len'][i]
+                if 'alias_count'  in df.columns:
+                    alias_count_dict[target_word] = df['alias_count'][i]
+
+        else: # group by target_word
+            sentence_dict[target_word].append(sentence)
+            target_word_embeddings_dict[target_word].append(target_word_embedding)
+            word_type_dict[target_word] = word_type
+            if 'notable_figer_types'  in df.columns:
+                category_dict[target_word] = df['notable_figer_types'][i]
+            if 'wiki_id'  in df.columns:
+                wiki_id_dict[target_word] = df['wiki_id'][i]
+            if 'target_word_sub_len'  in df.columns:
+                target_word_sub_len_dict[target_word] = df['target_word_sub_len'][i]
+
+
         #target_word_embeddings_dict[target_word].append(torch.stack(target_word_embedding, dim=0))
 
     print('sentence_count 作成')
     sentence_count = [len(s) for s in list(sentence_dict.values())]
 
-    ## _df作成
+    
+    ## df作成
     aggregated_df = pd.DataFrame(
-        data = {'target_word' : list(sentence_dict.keys()), 
+        data = {
                 'sentence_list': list(sentence_dict.values()),
                 'sentence_count': sentence_count,
-                'target_word_embeddings_list' : list(target_word_embeddings_dict.values())
+                'target_word_embeddings_list' : list(target_word_embeddings_dict.values()),
+                'word_type' : list(word_type_dict.values())
                 }
         )
+    if is_group_by_Wiki_id: # group by wiki_id
+        aggregated_df['target_word'] = list(target_word_dict.values())
+    else: # group by target_word
+        aggregated_df['target_word'] = list(sentence_dict.keys())
+
+    if 'notable_figer_types'  in df.columns:
+        aggregated_df['notable_figer_types'] = list(category_dict.values())
+    if 'wiki_id'  in df.columns:
+        aggregated_df['wiki_id'] = list(wiki_id_dict.values())
+    if 'target_word_sub_len'  in df.columns:
+        aggregated_df['target_word_sub_len'] = list(target_word_sub_len_dict.values())
+    if 'alias_count'  in df.columns:
+        aggregated_df['alias_count'] = list(alias_count_dict.values())
+    
     print(aggregated_df.head())
     print(f"センテンス数： {aggregated_df['sentence_count'].sum()}")
     print(f"target_word数： {len(aggregated_df['target_word'])}\n")
 
     return aggregated_df
+
+
+
 
 args = get_args()
 
@@ -267,7 +401,7 @@ concat_df['target_word_embeddings_list'] = emb_list
 #concat_df['average_embeddings'] = concat_ave_emb
 
 # dfを集約する
-aggregated_df = aggregate_df(concat_df)
+aggregated_df = aggregate_df(concat_df, args.is_group_by_Wiki_id)
 
 # average_embeddingを作成
 average_embeddings_list = []
@@ -277,9 +411,16 @@ for embeddings_list in aggregated_df['target_word_embeddings_list']:
 print("Done : generate_average_vector")
 aggregated_df['average_embeddings'] = average_embeddings_list
 
+# WikipediaID → wiki_title
+#print("WikipediaID から wiki_title を作成")
+#wiki_title = [getTitleFromWikipediaURL(wiki_id) for wiki_id in aggregate_df['wiki_id']]
+#print(f"len(wiki_title) : {len(wiki_title)}")
+#print(f"len(aggregate_df) : {len(aggregate_df)}")
+#aggregated_df['wiki_title'] = wiki_title 
+
 
 if args.do_series:
-    own_count_list , percentage_of_own_cluster = series_cal_percentage_of_own_cluster(aggregated_df, args.L_p)
+    own_count_list , percentage_of_own_cluster, wrong_cluster_list, wrong_pair_list, wrong_type_list = series_cal_percentage_of_own_cluster(aggregated_df, args.L_p, args.is_group_by_Wiki_id)
 elif args.do_parallel:
     own_count_list , percentage_of_own_cluster = parallel_cal_percentage_of_own_cluster(aggregated_df, args.L_p)
 else:
@@ -289,8 +430,14 @@ else:
 
 aggregated_df['own_count_list'] = own_count_list
 aggregated_df['percentage_of_own_cluster'] = percentage_of_own_cluster
+aggregated_df['wrong_cluster'] = wrong_cluster_list
+aggregated_df['wrong_types'] = wrong_type_list
+if wrong_pair_list != []:
+    aggregated_df['wrong_pair'] = wrong_pair_list
 
 print(aggregated_df.head())
 
 ## dfのown clusterについて　csv形式で保存する
-save_df_to_csv(aggregated_df, args.output_path)
+save_df2jsonl(aggregated_df, args.output_path)
+
+# dfも保存するとよさそう？

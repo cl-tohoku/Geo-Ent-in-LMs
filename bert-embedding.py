@@ -22,6 +22,8 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=os.path.abspath, 
                             help="input dataset path")
+    parser.add_argument("--output",  type=os.path.abspath, 
+                            help="output tensor path")
     # 後にcategoryは廃止する
     parser.add_argument('--category', type=str, default='ne',
                         help='word category. e.g. ne, common_noun')
@@ -31,6 +33,8 @@ def get_args():
                         help="Setting the L_p norm used in the distance function")
     parser.add_argument("--batch_size", type=int, default=8,
                         help="")
+    parser.add_argument("--layer", type=int, default=None,
+                        help="getting layer")                  
     #parser.add_argument("--sentences_lower", type=int, default=0,
     #                    help="Lower limit on the number of sentences")
     #parser.add_argument("--split", type=int, default=0,
@@ -205,6 +209,7 @@ dataloader = DataLoader(sentence_dataset, batch_size=args.batch_size)
 
 print(f'input file path: {jsonl_file_path}')
 print(f'batch_size: {args.batch_size}')
+print(f'Location of the layer to be acquired : {args.layer}')
 
 
 # modelへの最大入力長
@@ -233,13 +238,21 @@ else:
         tokenized_sentence_list = tokenized_sentence['input_ids'].tolist()
         with torch.no_grad():
             outputs = model(**tokenized_sentence)
-            last_hidden_states = outputs.last_hidden_state
+            if args.layer is not None:
+                hidden_states = outputs.hidden_states[args.layer] #output.hidden_states[0] is the input state (Therefore, ignore it)
+            else :
+                hidden_states = outputs.last_hidden_state
         try:
-            # target_wordのindexを得る 
+            # Get the embedding for target_token
             # いまのところ多分サブワードは考慮していない（サブワード分割の先頭のみ）
             # TODO:↓ここfor文に書き直す&tryでチェックして，ValueErrorがあれば，所定の場所のみ[] か""にする?
-            tokenized_target_token_indexes = [tokenized_s.index(tokenized_target_w[0]) for (tokenized_target_w, tokenized_s) in [(tokenized_target_w, tokenized_s) for tokenized_target_w, tokenized_s in zip(tokenized_target_word['input_ids'], tokenized_sentence_list)]]
-            tokenized_target_token_embeddings = [sentence_embeddings[token_index] for token_index, sentence_embeddings in zip(tokenized_target_token_indexes, last_hidden_states)]
+            #tokenized_target_token_indexes = [tokenized_s.index(tokenized_target_w[0]) for (tokenized_target_w, tokenized_s) in [(tokenized_target_w, tokenized_s) for tokenized_target_w, tokenized_s in zip(tokenized_target_word['input_ids'], tokenized_sentence_list)]]
+            #tokenized_target_token_embeddings = [sentence_embeddings[token_index] for token_index, sentence_embeddings in zip(tokenized_target_token_indexes, hidden_states)]
+
+            # 以下はサブワード分割対応後
+            tokenized_target_token_indexes = [list(range(tokenized_s.index(tokenized_target_w[0]), tokenized_s.index(tokenized_target_w[0])+len(tokenized_target_w))) for (tokenized_target_w, tokenized_s) in [(tokenized_target_w, tokenized_s) for tokenized_target_w, tokenized_s in zip(tokenized_target_word['input_ids'], tokenized_sentence_list)]]
+            tokenized_target_token_embeddings = [sentence_embeddings[token_index] for token_index, sentence_embeddings in zip(tokenized_target_token_indexes, hidden_states)]
+            ave_tokenized_target_token_embeddings = [generate_average_vector(embs) for embs in tokenized_target_token_embeddings]
         except Exception as error:
             print(error)
             for w, s in zip(target_word, sentence):
@@ -250,14 +263,19 @@ else:
             #print(f'target_word : {target_word}')
             #print(f'sentence : {sentence}')
              
-        
-        target_token_embeddings_list.extend(tokenized_target_token_embeddings)
-        emb_tensor = torch.stack(target_token_embeddings_list, dim=0)
+        #target_token_embeddings_list.extend(tokenized_target_token_embeddings)
+        target_token_embeddings_list.extend(ave_tokenized_target_token_embeddings)
+    
+    emb_tensor = torch.stack(target_token_embeddings_list, dim=0)
 
     # save embeddings
-    path_without_ext = str(jsonl_file_path).replace('.jsonl', '')
-    print(f"save: {path_without_ext}_tensor.pt")
-    torch.save(emb_tensor, path_without_ext + '_tensor.pt')
+    if args.output is not None:
+        output_path = args.output
+    else: 
+        path_without_ext = str(jsonl_file_path).replace('.jsonl', '')
+        output_path = path_without_ext + '_tensor.pt'
+    print(f"save: {output_path}")
+    torch.save(emb_tensor, output_path)
 
 
     # df →　jsonl形式で保存する

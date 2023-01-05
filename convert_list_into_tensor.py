@@ -17,7 +17,7 @@ from itertools import chain
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--emb_path", required=True, nargs='*', 
+    parser.add_argument("--emb_path_list", required=True, nargs='*', 
                             help="")
     args = parser.parse_args()
     return args
@@ -34,4 +34,4 @@ def convert_list_into_tensor(path_list):
         torch.save(emb_tensor, path_without_ext +  "_tensor.pt")
 
 args = get_args()
-convert_list_into_tensor(args.emb_path)
+convert_list_into_tensor(args.emb_path_list)

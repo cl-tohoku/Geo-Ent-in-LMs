@@ -23,17 +23,23 @@ print(args.input)
 df = read_json(args.input)
 
 #以下は集約された版
-#print(f"センテンス数： {'{:,}'.format(df['sentence_count'].sum())}")
-#print(f"target_word種類数： {'{:,}'.format(len(df['target_word']))}")
+print(f"センテンス数： {'{:,}'.format(df['sentence_count'].sum())}")
+print(f"NE種類数： {'{:,}'.format(len(df['wiki_id']))}")
 
 #以下は集約されていない版
-word_type_counter = collections.Counter(df['word_type'])
-print(f"word_typeの分布： {word_type_counter}")
-print(f"NEの数：{word_type_counter['ne']}，    NEの割合： {word_type_counter['ne']/len(df['word_type'])} = {word_type_counter['ne']/len(df['word_type'])* 100}%")
-print(f"NE以外の数：{word_type_counter['non_ne']}，    NE以外の割合： {word_type_counter['non_ne']/len(df['word_type'])} = {word_type_counter['non_ne']/len(df['word_type']) * 100}%")
-print()
+#word_type_counter = collections.Counter(df['word_type'])
+#print(f"word_typeの分布： {word_type_counter}")
+#print(f"NEの数：{word_type_counter['ne']}，    NEの割合： {word_type_counter['ne']/len(df['word_type'])} = {word_type_counter['ne']/len(df['word_type'])* 100}%")
+#print(f"NE以外の数：{word_type_counter['non_ne']}，    NE以外の割合： {word_type_counter['non_ne']/len(df['word_type'])} = {word_type_counter['non_ne']/len(df['word_type']) * 100}%")
+#print()
 
-print(df.head(args.n))
+#print(df.head(args.n))
+
+#for i in range(500):
+#    print(f"{df['wiki_id'][i]}\t{df['title'][i]}")
+
+#print(type(df['wiki_id'][1]))
+#print(type(df['title'][i]))
 
 
 

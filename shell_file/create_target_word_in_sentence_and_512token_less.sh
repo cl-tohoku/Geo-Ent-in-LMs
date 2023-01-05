@@ -52,22 +52,32 @@
 #)
 
 # ga02
-input_path_list=(\
-"/data/wikilinks/mix/ne_and_non_ne_10000000_split1.jsonl" \
-"/data/wikilinks/mix/ne_and_non_ne_10000000_split2.jsonl" \
-"/data/wikilinks/mix/ne_and_non_ne_10000000_split3.jsonl" \
-"/data/wikilinks/mix/ne_and_non_ne_10000000_split4.jsonl" \
-)
+#input_path_list=(\
+#"/data/wikilinks/mix/ne_and_non_ne_10000000_split1.jsonl" \
+#"/data/wikilinks/mix/ne_and_non_ne_10000000_split2.jsonl" \
+#"/data/wikilinks/mix/ne_and_non_ne_10000000_split3.jsonl" \
+#"/data/wikilinks/mix/ne_and_non_ne_10000000_split4.jsonl" \
+#)
 
 # ga01
 #input_path_list=(\
 #"/data/wikilinks/mix/ne_and_non_ne_10000000.jsonl" \
 #)
 
-batch_size=256
+# NE(Person+Location) (多様な周辺文脈）
+#input_path_list=(\
+#"/work/masaki/data/wikilinks/ne/Person_Location/separete/replaced_wikilinks_more10_title.jsonl" \
+#)
+
+## NE（多様な周辺文脈 and 多様な表層） サンプリング済み
+input_path_list=(\
+"/work/masaki/data/wikilinks/ne/Person_Location/unique_sentence/separete/sampled_15962/wikilinks_more10.jsonl"
+)
+
+batch_size=2048
 
 for input_path in ${input_path_list[@]}
 do  
-    (python3 wikilinks_preprocess.py --preprocessors create_target_word_in_sentence_and_512token_less --input $input_path --batch_size $batch_size) &
+    (python3 wikilinks_preprocess.py --preprocessors create_target_word_in_sentence_and_512token_less --input $input_path --batch_size $batch_size --is_ne) &
 done
 wait
