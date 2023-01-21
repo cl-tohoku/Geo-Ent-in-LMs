@@ -1,5 +1,0 @@
-input_path="/data/wikilinks/aggregated_preprocessed_common_noun_512tokens_non_ne_vocabwikilinks_more_10.jsonl"
-
-
-python3 wikilinks_preprocess.py --preprocessors create_df_target_word_same_length --input $input_path
-wait
