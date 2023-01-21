@@ -3,14 +3,11 @@ import io,sys
 import os
 import csv
 from collections import defaultdict
-from transformers import BertTokenizer, BertModel
 import pandas as pd
 import numpy as np
-import numpy.linalg as LA
 import torch
 import re
 from scipy.spatial.distance import cosine
-from plot import plot_embeddings_bokeh
 import itertools
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
@@ -176,6 +173,9 @@ def series_cal_percentage_of_own_cluster(df, p=2, is_group_by_Wiki_id=False):
         own cluster percentage: List of floats 
     """
 
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    print(f"device : {device}")
+
     print('直列処理')
     # distance function
     pdist = torch.nn.PairwiseDistance(p=p)
@@ -187,8 +187,9 @@ def series_cal_percentage_of_own_cluster(df, p=2, is_group_by_Wiki_id=False):
     wrong_type_list = []
     wrong_pair_list = []
     for i, (target_word_embeddings_list, sentence_count) in enumerate(zip(tqdm(df['target_word_embeddings_list']), df['sentence_count'])):
-        target_word_embeddings_tensor = torch.stack(target_word_embeddings_list)
-        average_embeddings = torch.stack(df['average_embeddings'].tolist())
+        target_word_embeddings_tensor = torch.stack(target_word_embeddings_list).to(device)
+        average_embeddings = torch.stack(df['average_embeddings'].tolist()).to(device)
+
         d = torch.cdist(target_word_embeddings_tensor, average_embeddings, p=2)
         values,indices =  torch.min(d, dim=1)
         own_count = torch.count_nonzero(indices == i).item()
@@ -378,27 +379,15 @@ args = get_args()
 ## dataset install
 df_list = multiple_read_jsonl(args.jsonl_path)
 emb_list = multiple_load_tensor(args.emb_path)
-#ave_emb_list = multiple_load_tensor(args.ave_emb_path)
-#print_arg_path_list(args.jsonl_path)
+
 
 ## splitされたデータをconcatする
 concat_df = pd.concat(df_list).reset_index(drop=True)
-#print(f'len(concat_df): {len(concat_df)}','\n')
-#print(f'len(concat_df[0]): {len(concat_df[0])}','\n')
-#print(f'len(concat_df[0][0]): {len(concat_df[0][0])}','\n')
 
-#concat_emb = list(chain.from_iterable(emb_list)) #extendなのでいらない
-#concat_emb = emb_list
+
 print(f'len(concat_emb): {len(emb_list)}','\n')
 
-## ave_embは後で作る
-#concat_ave_emb = list(chain.from_iterable(ave_emb_list))
-#print(f'len(concat_ave_emb): {len(concat_ave_emb)}','\n')
-#print(f"concat_df['sentence_count'].sum(): {concat_df['sentence_count'].sum()}","\n")
-
-
 concat_df['target_word_embeddings_list'] = emb_list
-#concat_df['average_embeddings'] = concat_ave_emb
 
 # dfを集約する
 aggregated_df = aggregate_df(concat_df, args.is_group_by_Wiki_id)

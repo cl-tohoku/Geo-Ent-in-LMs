@@ -172,3 +172,11 @@ visualization/
 *memo*
 wikilinks.ipynb
 requirements.in
+plot_ne.py
+print_aggregated_wikilinks.py
+print_ne_sentence.py
+wikilinks_preprocess.py
+df_column2csv.py
+convert_list_into_tensor.py
+analysis-bert-embeding.ipynb
+shell_file/*

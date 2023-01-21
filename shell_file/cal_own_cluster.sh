@@ -132,28 +132,28 @@
 
 # ne と Non_ne の Mixデータ
 #jsonl_path=(\
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split1.jsonl" \
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split2.jsonl" \
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split3.jsonl" \
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split4.jsonl" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split1.jsonl" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split2.jsonl" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split3.jsonl" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split4.jsonl" \
 #)
 
 #emb_path=(\
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split1_tensor.pt" \
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split2_tensor.pt" \
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split3_tensor.pt" \
-#"/work/masaki/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split4_tensor.pt" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split1_tensor.pt" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split2_tensor.pt" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split3_tensor.pt" \
+#"/data/wikilinks/mix/target_word_in_sentence/ne_and_non_ne_1000000_split4_tensor.pt" \
 #)
 
 # ne(Person Location) と Non_ne の Mixデータ
 #jsonl_path=(\
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/sampled/1000000/non_ne_984038.jsonl" \
-#"/work/masaki/data/wikilinks/ne/Person_Location/separete/subword1_5/sampled_15962/wikilinks_ne.jsonl" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/sampled/1000000/non_ne_984038.jsonl" \
+#"/data/wikilinks/ne/Person_Location/separete/subword1_5/sampled_15962/wikilinks_ne.jsonl" \
 #)
 #
 #emb_path=(\
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/sampled/1000000/non_ne_984038_tensor.pt " \
-#"/work/masaki/data/wikilinks/ne/Person_Location/separete/subword1_5/sampled_15962/wikilinks_ne_tensor.pt" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/sampled/1000000/non_ne_984038_tensor.pt " \
+#"/data/wikilinks/ne/Person_Location/separete/subword1_5/sampled_15962/wikilinks_ne_tensor.pt" \
 #)
 
 
@@ -164,26 +164,26 @@
 
 # ne(Person Location) と Non_ne の Mixデータ (点群数のフィルター済み) (表層が多様)
 #jsonl_path=(\
-#"/work/masaki/data/wikilinks/ne/Person_Location/separete/ne_alias/wikilinks_more10.jsonl" \
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
+#"/data/wikilinks/ne/Person_Location/separete/ne_alias/wikilinks_more10.jsonl" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
 #)
 #
 #emb_path=(\
-#"/work/masaki/data/wikilinks/ne/Person_Location/separete/ne_alias/wikilinks_more10_tensor.pt" \
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/separete/sampled/954067/filtered/sampled_non_ne_tensor.pt" \
+#"/data/wikilinks/ne/Person_Location/separete/ne_alias/wikilinks_more10_tensor.pt" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/separete/sampled/954067/filtered/sampled_non_ne_tensor.pt" \
 #)
 #output_path="./result/mix_Alias_ne_Location_Person_and_non_ne.jsonl"
 
 
 # ne(Person Location) と Non_ne の Mixデータ (点群数のフィルター済み&センテンスの重複なし) (周辺文脈が多様 & NEの表層が多様)
 #jsonl_path=(\
-#"/work/masaki/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/wikilinks_more10.jsonl" \
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
+#"/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/wikilinks_more10.jsonl" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
 #)
 #
 #emb_path=(\
-#"/work/masaki/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/wikilinks_more10_tensor.pt" \
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne_tensor.pt" \
+#"/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/wikilinks_more10_tensor.pt" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne_tensor.pt" \
 #)
 #output_path="./result/various_context_surface_ne_Location_Person_and_non_ne.jsonl"
 #
@@ -192,13 +192,13 @@
 
 # 【周辺文脈が多様】 ne(Person Location) と Non_ne の Mixデータ (点群数のフィルター済み)  センテンスの重複なし
 #jsonl_path=(\
-#"/work/masaki/data/wikilinks/ne/Person_Location/various_context/unique_sentence/separete/subword1_5/sampled_15962/wikilinks_ne.jsonl" \
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
+#"/data/wikilinks/ne/Person_Location/various_context/unique_sentence/separete/subword1_5/sampled_15962/wikilinks_ne.jsonl" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
 #)
 #
 #emb_path=(\
-#"/work/masaki/data/wikilinks/ne/Person_Location/various_context/unique_sentence/separete/subword1_5/sampled_15962/wikilinks_ne_tensor.pt" \
-#"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/last_layer/sampled_non_ne_tensor.pt" \
+#"/data/wikilinks/ne/Person_Location/various_context/unique_sentence/separete/subword1_5/sampled_15962/wikilinks_ne_tensor.pt" \
+#"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/last_layer/sampled_non_ne_tensor.pt" \
 #)
 #output_path="./result/UniqueSentence_VariousContext_NE_NonNE_addWrongList.jsonl"
 #python3 cal_own_cluster.py --jsonl_path ${jsonl_path[@]} --emb_path ${emb_path[@]} --output_path $output_path --do_series
@@ -206,13 +206,13 @@
 
 # 【周辺文脈とNE表層が多様】 ne(Person Location) と Non_ne の Mixデータ (点群数のフィルター済み)  センテンスの重複なし (周辺文脈のやつにNEをあわせた)
 jsonl_path=(\
-"/work/masaki/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/wikilinks_ne.jsonl" \
-"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
+"/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/wikilinks_ne.jsonl" \
+"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/sampled_non_ne.jsonl" \
 )
 
 emb_path=(\
-"/work/masaki/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/last_layer/wikilinks_ne_tensor.pt" \
-"/work/masaki/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/last_layer/sampled_non_ne_tensor.pt"
+"/data/wikilinks/ne/Person_Location/various_context_surface/unique_sentence/separete/sampled_15962/last_layer/wikilinks_ne_tensor.pt" \
+"/data/wikilinks/non_ne/512tokens/vocab/delete_symbol/unique_sentence/separete/sampled/954067/filtered/last_layer/sampled_non_ne_tensor.pt"
 )
 output_path="./result/NE_AWASETA_UniqueSentence_VariousContextSurface_NE_NonNE_addWrongList.jsonl"
 python3 cal_own_cluster.py --jsonl_path ${jsonl_path[@]} --emb_path ${emb_path[@]} --output_path $output_path --do_series --is_group_by_Wiki_id

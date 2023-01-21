@@ -2,7 +2,6 @@ import argparse
 import io,sys
 import os
 import csv
-from transformers import BertTokenizer, BertModel
 import pandas as pd
 import numpy as np
 import torch
@@ -22,7 +21,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", required=True, type=os.path.abspath, 
                             help="input dataset path")
-    parser.add_argument("--output",  type=os.path.abspath, 
+    parser.add_argument("--output", required=True ,  type=os.path.abspath, 
                             help="output tensor path")
     # 後にcategoryは廃止する
     parser.add_argument('--category', type=str, default='ne',
@@ -34,11 +33,9 @@ def get_args():
     parser.add_argument("--batch_size", type=int, default=8,
                         help="")
     parser.add_argument("--layer", type=int, default=None,
-                        help="getting layer")                  
-    #parser.add_argument("--sentences_lower", type=int, default=0,
-    #                    help="Lower limit on the number of sentences")
-    #parser.add_argument("--split", type=int, default=0,
-    #                    help="data split")
+                        help="getting layer") 
+    parser.add_argument("--model", type=str, default=None,
+                        help="using model")                    
     args = parser.parse_args()
     return args
 
@@ -70,75 +67,6 @@ def generate_average_vector(embeddings):
         embeddings = torch.tensor(embeddings)
     average_vector = torch.sum(embeddings, axis=0) / len(embeddings)
     return average_vector
-
-
-def bert_text_preparation(text, tokenizer):
-    """Preparing the input for BERT
-    
-    Takes a string argument and performs
-    pre-processing like adding special tokens,
-    tokenization, tokens to ids, and tokens to
-    segment ids. All tokens are mapped to seg-
-    ment id = 1.
-    
-    Args:
-        text (str): Text to be converted
-        tokenizer (obj): Tokenizer object
-            to convert text into BERT-re-
-            adable tokens and ids
-        
-    Returns:
-        list: List of BERT-readable tokens
-        obj: Torch tensor with token ids
-        obj: Torch tensor segment ids
-    """
-    marked_text = "[CLS] " + text + " [SEP]"
-    tokenized_text = tokenizer.tokenize(marked_text)
-    indexed_tokens = tokenizer.convert_tokens_to_ids(tokenized_text)
-    segments_ids = [1]*len(indexed_tokens)
-
-    # Convert inputs to PyTorch tensors
-    tokens_tensor = torch.tensor([indexed_tokens])
-    segments_tensors = torch.tensor([segments_ids])
-
-    return tokenized_text, tokens_tensor, segments_tensors
-
-
-def get_bert_embeddings(tokens_tensor, segments_tensors, model):
-    """Get embeddings from an embedding model
-    
-    Args:
-        tokens_tensor (obj): Torch tensor size [n_tokens]
-            with token ids for each token in text
-        segments_tensors (obj): Torch tensor size [n_tokens]
-            with segment ids for each token in text
-        model (obj): Embedding model to generate embeddings
-            from token and segment ids
-    
-    Returns:
-        np.array: List of list of floats of size
-            [n_tokens, n_embedding_dimensions]
-            containing embeddings for each token
-    
-    """
-    
-    # Gradient calculation id disabled
-    # Model is in inference mode
-    with torch.no_grad():
-        outputs = model(tokens_tensor, segments_tensors)
-        # Removing the first hidden state
-        # The first state is the input state
-        #hidden_states = outputs[2][1:]
-        token_embeddings = outputs.last_hidden_state
-
-    # Getting embeddings from the final BERT layer
-    #token_embeddings = hidden_states[-1]
-    # Collapsing the tensor into 1-dimension
-    token_embeddings = torch.squeeze(token_embeddings, dim=0)
-    # Converting torchtensors to lists
-    list_token_embeddings = np.array([token_embed.tolist() for token_embed in token_embeddings])
-
-    return list_token_embeddings
 
 
 def plot_embeddings(df):
@@ -190,16 +118,49 @@ class MyDataset(Dataset):
         return target_word, sentence
 
 
-# Loading the pre-trained BERT model
-model = BertModel.from_pretrained('bert-base-uncased', output_hidden_states = True)
-# Setting up the tokenizer
-tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
 
 args = get_args()
 
+## device check
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+print(f"device : {device}")
+
+
+if args.model is None:
+    print("model : bert-base-uncased")
+    from transformers import BertTokenizer, BertModel
+    model = BertModel.from_pretrained('bert-base-uncased', output_hidden_states = True)
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+else :
+    print(f"model : {args.model}")
+    if args.model.split('-')[0] == "bert" :
+        from transformers import BertTokenizer, BertModel
+        model = BertModel.from_pretrained(args.model, output_hidden_states = True)
+        tokenizer = BertTokenizer.from_pretrained(args.model)
+    elif args.model.split('-')[0] == "roberta"  :
+        from transformers import RobertaTokenizer, RobertaModel
+        model = RobertaModel.from_pretrained(args.model, output_hidden_states = True)
+        tokenizer = RobertaTokenizer.from_pretrained(args.model)
+    elif args.model.split('-')[0] == "albert"  :
+        from transformers import AlbertTokenizer, AlbertModel
+        model = AlbertModel.from_pretrained(args.model, output_hidden_states = True)
+        tokenizer = AlbertTokenizer.from_pretrained(args.model) 
+    elif args.model.split('-')[0] == "distilbert"  :
+        from transformers import DistilBertTokenizer, DistilBertModel
+        model = DistilBertModel.from_pretrained(args.model, output_hidden_states = True)
+        tokenizer = DistilBertTokenizer.from_pretrained(args.model) 
+    elif "luke-" in args.model  :
+        from transformers import LukeTokenizer, LukeModel
+        model = LukeModel.from_pretrained(args.model, output_hidden_states = True)
+        tokenizer = LukeTokenizer.from_pretrained(args.model) 
+    else:
+        raise ValueError("args.model is an invalid value.")
+
+model.to(device)
+
+
 ## dataset install
 jsonl_file_path = args.input
-#print(f'jsonl_file_path : {jsonl_file_path}')
 is_file = os.path.isfile(jsonl_file_path)
 if is_file == False:
     print(f"{jsonl_file_path} が存在しません")
@@ -212,6 +173,8 @@ print(f'batch_size: {args.batch_size}')
 print(f'Location of the layer to be acquired : {args.layer}')
 
 
+
+
 # modelへの最大入力長
 INPUT_MAX_LENGTH = 512
 
@@ -222,13 +185,9 @@ if os.path.isfile(cached_jsonl_file_path):
     pass
     #df = pd.read_json(cached_jsonl_file_path, orient='records', lines=True)
 else:
-    #df = pd.read_json(jsonl_file_path, orient="records", lines=True)
-    #print(df.head())
     print("Computing Embedding")
     # Getting embeddings for the target word
     # word in all given contexts
-
-    #target_token_category = get_target_token_category(args)
 
     target_token_embeddings_list = []
     for i, data in enumerate(tqdm(dataloader)):
@@ -236,6 +195,7 @@ else:
         tokenized_target_word = tokenizer(target_word, add_special_tokens=False)
         tokenized_sentence = tokenizer(sentence, return_tensors="pt", max_length=INPUT_MAX_LENGTH, padding=True, truncation=True)
         tokenized_sentence_list = tokenized_sentence['input_ids'].tolist()
+        tokenized_sentence = tokenized_sentence.to(device)
         with torch.no_grad():
             outputs = model(**tokenized_sentence)
             if args.layer is not None:
@@ -244,12 +204,6 @@ else:
                 hidden_states = outputs.last_hidden_state
         try:
             # Get the embedding for target_token
-            # いまのところ多分サブワードは考慮していない（サブワード分割の先頭のみ）
-            # TODO:↓ここfor文に書き直す&tryでチェックして，ValueErrorがあれば，所定の場所のみ[] か""にする?
-            #tokenized_target_token_indexes = [tokenized_s.index(tokenized_target_w[0]) for (tokenized_target_w, tokenized_s) in [(tokenized_target_w, tokenized_s) for tokenized_target_w, tokenized_s in zip(tokenized_target_word['input_ids'], tokenized_sentence_list)]]
-            #tokenized_target_token_embeddings = [sentence_embeddings[token_index] for token_index, sentence_embeddings in zip(tokenized_target_token_indexes, hidden_states)]
-
-            # 以下はサブワード分割対応後
             tokenized_target_token_indexes = [list(range(tokenized_s.index(tokenized_target_w[0]), tokenized_s.index(tokenized_target_w[0])+len(tokenized_target_w))) for (tokenized_target_w, tokenized_s) in [(tokenized_target_w, tokenized_s) for tokenized_target_w, tokenized_s in zip(tokenized_target_word['input_ids'], tokenized_sentence_list)]]
             tokenized_target_token_embeddings = [sentence_embeddings[token_index] for token_index, sentence_embeddings in zip(tokenized_target_token_indexes, hidden_states)]
             ave_tokenized_target_token_embeddings = [generate_average_vector(embs) for embs in tokenized_target_token_embeddings]
@@ -259,26 +213,15 @@ else:
                 print(tokenizer.tokenize(w))
                 print(tokenizer.tokenize(s))
             raise error  
-            #print(f'sentence_list index : {i}')
-            #print(f'target_word : {target_word}')
-            #print(f'sentence : {sentence}')
              
-        #target_token_embeddings_list.extend(tokenized_target_token_embeddings)
         target_token_embeddings_list.extend(ave_tokenized_target_token_embeddings)
     
     emb_tensor = torch.stack(target_token_embeddings_list, dim=0)
 
     # save embeddings
-    if args.output is not None:
-        output_path = args.output
-    else: 
-        path_without_ext = str(jsonl_file_path).replace('.jsonl', '')
-        output_path = path_without_ext + '_tensor.pt'
-    print(f"save: {output_path}")
-    torch.save(emb_tensor, output_path)
-
-
-    # df →　jsonl形式で保存する
-    #df.to_json('/data/wikilinks/cached_testdata.jsonl', orient='records', force_ascii=False, lines=True)
-    #float はjsonで保存できないっぽい
+    dirname = os.path.dirname(args.output)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+    print(f"save: {args.output}")
+    torch.save(emb_tensor.to('cpu'), args.output)
 

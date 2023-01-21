@@ -326,7 +326,10 @@ def plot_embeddings(
     if classes is not None:
         for cls in set(classes):
             i = (classes == cls).nonzero()
-            ax.scatter(x[i], y[i], label=cls, **scatter_kwargs)
+            if class2color is not None:
+                ax.scatter(x[i], y[i], c=class2color[cls], label=cls,  **scatter_kwargs)
+            else :
+                ax.scatter(x[i], y[i], label=cls, **scatter_kwargs)
     elif color is not None:
         sc = ax.scatter(x, y, c=color, cmap=cmap, **scatter_kwargs)
         cb = fig.colorbar(sc, ticks=colorbar_ticks)
@@ -356,7 +359,7 @@ def plot_embeddings(
         plt.title(title)
     plt.axis('tight')
     if classes is not None:
-        plt.legend(loc='best', scatterpoints=1, markerscale=5, fontsize=10)
+        plt.legend(loc='best', scatterpoints=1, markerscale=6, fontsize=14)
     plt.tight_layout()
     if outfile:
         plt.savefig(str(outfile))
