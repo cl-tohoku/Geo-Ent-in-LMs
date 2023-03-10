@@ -25,8 +25,6 @@ def get_args():
                             help="input dataset path")
     parser.add_argument("--emb_path", required=True, nargs='*', 
                             help="")
-    #parser.add_argument("--ave_emb_path", required=True, nargs='*', 
-    #                        help="")
     parser.add_argument("--L_p", type=int, default=2,
                         help="Setting the L_p norm used in the distance function")
     parser.add_argument("--output_path", required=True, type=os.path.abspath, 
@@ -37,6 +35,8 @@ def get_args():
                             help="")
     parser.add_argument("--is_group_by_Wiki_id", action='store_true',
                             help="")
+    parser.add_argument("--cuda_number", type=str, default="0",
+                        help="cuda number")  
     args = parser.parse_args()
     return args
 
@@ -163,7 +163,7 @@ def parallel_cal_percentage_of_own_cluster(df, p=2):
     return own_count_list, percentage_of_own_cluster
 
 # 直列ver
-def series_cal_percentage_of_own_cluster(df, p=2, is_group_by_Wiki_id=False):
+def series_cal_percentage_of_own_cluster(df, p=2, is_group_by_Wiki_id=False, cuda_number="0"):
     """
     input:
         dataframe
@@ -173,7 +173,8 @@ def series_cal_percentage_of_own_cluster(df, p=2, is_group_by_Wiki_id=False):
         own cluster percentage: List of floats 
     """
 
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    ## device check
+    device = torch.device(f"cuda:{cuda_number}" if torch.cuda.is_available() else "cpu")
     print(f"device : {device}")
 
     print('直列処理')
@@ -226,7 +227,11 @@ def cal_micro_ave(list_1, list_2):
     return list_1.sum() / list_2.sum()
 
 def save_df2jsonl(df, output_path):
-    #TODO: result dir がなければ作成する
+    # save embeddings
+    dirname = os.path.dirname(output_path)
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+        
     new_df = df[['target_word', 'notable_figer_types', 'percentage_of_own_cluster', 'own_count_list',  'sentence_count', 'wrong_cluster', 'wrong_types', 'wiki_id', 'word_type']]
 
     if 'target_word_sub_len'  in df.columns:
@@ -386,6 +391,8 @@ concat_df = pd.concat(df_list).reset_index(drop=True)
 
 
 print(f'len(concat_emb): {len(emb_list)}','\n')
+print(f'len(concat_df): {len(concat_df)}','\n')
+
 
 concat_df['target_word_embeddings_list'] = emb_list
 
@@ -409,7 +416,7 @@ aggregated_df['average_embeddings'] = average_embeddings_list
 
 
 if args.do_series:
-    own_count_list , percentage_of_own_cluster, wrong_cluster_list, wrong_pair_list, wrong_type_list = series_cal_percentage_of_own_cluster(aggregated_df, args.L_p, args.is_group_by_Wiki_id)
+    own_count_list , percentage_of_own_cluster, wrong_cluster_list, wrong_pair_list, wrong_type_list = series_cal_percentage_of_own_cluster(aggregated_df, args.L_p, args.is_group_by_Wiki_id, args.cuda_number)
 elif args.do_parallel:
     own_count_list , percentage_of_own_cluster = parallel_cal_percentage_of_own_cluster(aggregated_df, args.L_p)
 else:

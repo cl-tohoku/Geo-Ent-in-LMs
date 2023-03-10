@@ -1,3 +1,8 @@
+
+# Copyright (c) 2017 Benjamin Heinzerling
+# Licensed under the MIT license. 
+
+
 from pathlib import Path
 import os
 import matplotlib as mpl
@@ -287,10 +292,10 @@ def embed_2d(
 
 def plot_embeddings(
         emb, emb_method=None,
-        labels=None, color=None, classes=None, class2color=None, title=None,
+        labels=None, color=None, classes=None, class2color=None, class2marker=None, title=None,
         outfile=None, cmap="viridis", max_labels=100,
         colorbar_ticks=None, reverse_colorbar=False, colorbar_label=None,
-        label_fontpath=None,
+        label_fontpath=None, is_legend=True,
         **scatter_kwargs):
     """
     Plot a scatterplot of the embeddings contained in emb.
@@ -306,6 +311,7 @@ def plot_embeddings(
     classes:  Optional class for each embedding, according to which it will
     be colored in the plot.
     class2color: A map which determines the color assigned to each class
+    class2marker: A map which determines the marker assigned to each class
     outfile: If provided, save plot to this file instead of showing it
     cmap: colormap
     max_labels: maximum number of labels to be displayed
@@ -315,7 +321,8 @@ def plot_embeddings(
         x, y = embed_2d(emb, emb_method).T
     else:
         x, y = emb.T
-    figsize = (14, 12) if color is not None else (12, 12)
+    #figsize = (14, 12) if color is not None else (12, 12)
+    figsize = (14*2.6, 14) 
     fig = plt.figure(figsize=figsize)
     ax = fig.add_subplot(111)
     ax.set_aspect('equal')
@@ -328,6 +335,8 @@ def plot_embeddings(
             i = (classes == cls).nonzero()
             if class2color is not None:
                 ax.scatter(x[i], y[i], c=class2color[cls], label=cls,  **scatter_kwargs)
+            elif class2marker is not None:
+                ax.scatter(x[i], y[i], marker=class2marker[cls], label=cls,  **scatter_kwargs)
             else :
                 ax.scatter(x[i], y[i], label=cls, **scatter_kwargs)
     elif color is not None:
@@ -359,9 +368,13 @@ def plot_embeddings(
         plt.title(title)
     plt.axis('tight')
     if classes is not None:
-        plt.legend(loc='best', scatterpoints=1, markerscale=6, fontsize=14)
+        if is_legend:
+            plt.legend(loc='best', scatterpoints=1, markerscale=4, fontsize=24)
     plt.tight_layout()
     if outfile:
+        dirname = os.path.dirname(outfile)
+        if not os.path.isdir(dirname):
+            os.makedirs(dirname)
         plt.savefig(str(outfile))
     else:
         plt.show()
