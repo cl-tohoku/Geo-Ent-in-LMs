@@ -15,17 +15,15 @@ Please download the file "reproduction_data_NLP2023.zip" from Google Drive into 
 ## Visualization of our results
 The repository's ``result`` directory already includes the results of the experiment, which makes reproducing the visualization easy.
 
-Run experiments according to [visualization_reproduction.ipynb]().
+Run experiments according to [visualization_reproduction.ipynb](https://github.com/cl-tohoku/Geo-Ent-in-LMs/blob/main/visualization_reproduction.ipynb).
 
 ## Get Contextual word Embeddings from the model
-
-
-Please ensure that the 'data_dir_path' in ``get_embeddings_formBERT.sh`` corresponds to the directory where you have extracted the 'data.zip' file.
 
 You can get the embeddings from BERT by executing the following code:
 ```
 bash ./shell_file/get_embeddings_formBERT.sh
 ```
+※ Please ensure that the ``data_dir_path`` in ``get_embeddings_formBERT.sh`` corresponds to the directory where you have extracted the 'data.zip' file.
 
 
 ## Calculation of condensation rate
@@ -34,3 +32,5 @@ You can run the program below to calculate the condensation rate and get the res
 ```
 bash ./shell_file/cal_condensation_ratio.sh
 ```
+
+※ Please ensure that the ``data_dir_path`` in ``cal_condensation_ratio.sh`` corresponds to the directory where you have extracted the 'data.zip' file.
